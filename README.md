@@ -29,6 +29,7 @@ Installation & Setup
 
 1. git clone https://github.com/Ndima-karabo17/React-Native-UI-Challenge.git
 2. npm install  to install dependencies
-3. npx expo start to run the application
-4. Scan the QR Code using your expo go app in your android
+3. npm install react
+4. npx expo start to run the application
+5. Scan the QR Code using your expo go app in your android
 
