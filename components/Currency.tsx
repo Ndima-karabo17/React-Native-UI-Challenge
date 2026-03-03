@@ -1,4 +1,4 @@
-// components/CurrencySection.tsx
+
 import React from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
