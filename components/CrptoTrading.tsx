@@ -7,57 +7,87 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CoinType } from './types';
-import { ETH_BALANCE, USD_BALANCE, ETH_TO_USD } from './constant';
-import { convertAmount, calcTradeDetails, formatNumber } from './utils';
+import { Coin, CoinSymbol } from './types';
+import { COINS, convertBetweenCoins } from './constant';
+import { calcTradeDetails, formatNumber } from './utils';
 import Currency from './Currency';
 import HandlerCurrency from './HandlerCurrency';
 import DetailsRow from './DetailsRow';
+import CoinPickerModal from './coinpickermodal';
+
+type PickerTarget = 'top' | 'bottom' | null;
 
 const CryptoTrading: React.FC = () => {
   const { top, bottom } = useSafeAreaInsets();
 
-  const [topCoin, setTopCoin]       = useState<CoinType>('ETH');
+  const [topCoin, setTopCoin]       = useState<Coin>(COINS['ETH']);
+  const [bottomCoin, setBottomCoin] = useState<Coin>(COINS['USDT']);
   const [topAmount, setTopAmount]   = useState<string>('1');
-  const [bottomAmount, setBottomAmount] = useState<string>((ETH_TO_USD).toFixed(2));
+  const [bottomAmount, setBottomAmount] = useState<string>(
+    convertBetweenCoins('1', 'ETH', 'USDT'),
+  );
+  const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
   const [showSuccess, setShowSuccess]   = useState(false);
 
-  const bottomCoin: CoinType = topCoin === 'ETH' ? 'USD' : 'ETH';
-  const isBuying             = topCoin === 'USD';
-  const actionLabel          = isBuying ? 'Buy ETH' : 'Sell ETH';
-
   const { valid, estimatedFee, youWillReceive, spread, gasFee } =
-    calcTradeDetails(topCoin, topAmount, bottomAmount);
+    calcTradeDetails(topCoin.symbol, topAmount, bottomCoin.symbol, bottomAmount);
 
-  // ── Handlers ────────────────────────────────────────────────────────────
+  // ── Amount handlers ──────────────────────────────────────────────────────
 
   const handleTopChange = useCallback(
     (val: string) => {
       setTopAmount(val);
-      setBottomAmount(convertAmount(val, topCoin));
+      setBottomAmount(convertBetweenCoins(val, topCoin.symbol, bottomCoin.symbol));
     },
-    [topCoin],
+    [topCoin.symbol, bottomCoin.symbol],
   );
 
   const handleBottomChange = useCallback(
     (val: string) => {
       setBottomAmount(val);
-      setTopAmount(convertAmount(val, bottomCoin));
+      setTopAmount(convertBetweenCoins(val, bottomCoin.symbol, topCoin.symbol));
     },
-    [bottomCoin],
+    [topCoin.symbol, bottomCoin.symbol],
   );
 
+  // ── Swap positions ───────────────────────────────────────────────────────
+
   const handleSwap = useCallback(() => {
-    setTopCoin((prev) => (prev === 'ETH' ? 'USD' : 'ETH'));
+    setTopCoin(bottomCoin);
+    setBottomCoin(topCoin);
     setTopAmount(bottomAmount);
     setBottomAmount(topAmount);
-  }, [topAmount, bottomAmount]);
+  }, [topCoin, bottomCoin, topAmount, bottomAmount]);
+
+  // ── Coin selection ───────────────────────────────────────────────────────
+
+  const handleCoinSelected = useCallback(
+    (coin: Coin) => {
+      if (pickerTarget === 'top') {
+        setTopCoin(coin);
+        setBottomAmount(convertBetweenCoins(topAmount, coin.symbol, bottomCoin.symbol));
+      } else if (pickerTarget === 'bottom') {
+        setBottomCoin(coin);
+        setBottomAmount(convertBetweenCoins(topAmount, topCoin.symbol, coin.symbol));
+      }
+      setPickerTarget(null);
+    },
+    [pickerTarget, topAmount, topCoin.symbol, bottomCoin.symbol],
+  );
+
+  // ── Trade action ─────────────────────────────────────────────────────────
 
   const handleAction = () => {
     if (!valid) return;
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 2500);
   };
+
+  // Exchange rate label
+  const rateLabel = `1 ${topCoin.symbol} = ${formatNumber(
+    topCoin.priceUSD / bottomCoin.priceUSD,
+    topCoin.priceUSD / bottomCoin.priceUSD < 1 ? 6 : 2,
+  )} ${bottomCoin.symbol}`;
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -74,13 +104,13 @@ const CryptoTrading: React.FC = () => {
           <View style={styles.liveIndicator} />
         </View>
 
-        {/* ── Currency inputs ── */}
         <View style={styles.body}>
+          {/* ── Currency inputs ── */}
           <Currency
             coin={topCoin}
             amount={topAmount}
-            balance={topCoin === 'ETH' ? ETH_BALANCE : USD_BALANCE}
             onAmountChange={handleTopChange}
+            onCoinSelect={() => setPickerTarget('top')}
           />
 
           <HandlerCurrency onSwap={handleSwap} />
@@ -88,16 +118,14 @@ const CryptoTrading: React.FC = () => {
           <Currency
             coin={bottomCoin}
             amount={bottomAmount}
-            balance={bottomCoin === 'ETH' ? ETH_BALANCE : USD_BALANCE}
             onAmountChange={handleBottomChange}
+            onCoinSelect={() => setPickerTarget('bottom')}
           />
 
           {/* ── Exchange rate ── */}
           <View style={styles.rateRow}>
             <Text style={styles.rateDot}>◆</Text>
-            <Text style={styles.rateText}>
-              1 ETH = {formatNumber(ETH_TO_USD)} USD
-            </Text>
+            <Text style={styles.rateText}>{rateLabel}</Text>
             <Text style={styles.rateDot}>◆</Text>
           </View>
 
@@ -105,15 +133,17 @@ const CryptoTrading: React.FC = () => {
           <TouchableOpacity
             style={[
               styles.actionButton,
-              !valid        && styles.actionButtonDisabled,
-              showSuccess   && styles.actionButtonSuccess,
+              !valid      && styles.actionButtonDisabled,
+              showSuccess && styles.actionButtonSuccess,
             ]}
             onPress={handleAction}
             disabled={!valid}
             activeOpacity={0.85}
           >
             <Text style={[styles.actionButtonText, !valid && styles.actionButtonTextDisabled]}>
-              {showSuccess ? '✓  Order Placed!' : actionLabel}
+              {showSuccess
+                ? '✓  Order Placed!'
+                : `Swap ${topCoin.symbol} → ${bottomCoin.symbol}`}
             </Text>
           </TouchableOpacity>
 
@@ -126,6 +156,22 @@ const CryptoTrading: React.FC = () => {
           </View>
         </View>
       </ScrollView>
+
+      {/* ── Coin picker modals ── */}
+      <CoinPickerModal
+        visible={pickerTarget === 'top'}
+        selectedSymbol={topCoin.symbol}
+        excludeSymbol={bottomCoin.symbol}
+        onSelect={handleCoinSelected}
+        onClose={() => setPickerTarget(null)}
+      />
+      <CoinPickerModal
+        visible={pickerTarget === 'bottom'}
+        selectedSymbol={bottomCoin.symbol}
+        excludeSymbol={topCoin.symbol}
+        onSelect={handleCoinSelected}
+        onClose={() => setPickerTarget(null)}
+      />
     </View>
   );
 };
@@ -138,8 +184,6 @@ const styles = StyleSheet.create({
   scroll: {
     flexGrow: 1,
   },
-
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -168,15 +212,11 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
-
-  // Body
   body: {
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 24,
   },
-
-  // Exchange rate
   rateRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -192,8 +232,6 @@ const styles = StyleSheet.create({
     color: '#a78bfa',
     fontSize: 10,
   },
-
-  // Action button
   actionButton: {
     height: 52,
     borderRadius: 16,
@@ -225,8 +263,6 @@ const styles = StyleSheet.create({
   actionButtonTextDisabled: {
     color: '#444',
   },
-
-  // Details
   detailsContainer: {
     marginTop: 16,
     paddingHorizontal: 4,

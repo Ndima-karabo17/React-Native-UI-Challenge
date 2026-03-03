@@ -6,38 +6,45 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { CurrencySectionProps } from './types';
-import { ETH_BALANCE, USD_BALANCE } from './constant';
 import { formatNumber, getConversionHint } from './utils';
 
-const Currency: React.FC<CurrencySectionProps> = ({ coin, amount, balance, onAmountChange }) => {
-  const isETH         = coin === 'ETH';
-  const balanceLabel  = isETH ? `${ETH_BALANCE} ETH` : `$${formatNumber(USD_BALANCE)}`;
-  const maxAmount     = isETH ? ETH_BALANCE : USD_BALANCE;
-  const conversionHint = getConversionHint(coin, amount);
+const Currency: React.FC<CurrencySectionProps> = ({
+  coin,
+  amount,
+  onAmountChange,
+  onCoinSelect,
+}) => {
+  const hint = getConversionHint(amount, coin.symbol, coin.symbol);
 
   return (
     <View style={styles.section}>
-      {/* ── Top row: coin selector + balance ── */}
+      {/* ── Top row ── */}
       <View style={styles.topRow}>
-        <View style={styles.coinSelector}>
-          {isETH ? (
-            <MaterialCommunityIcons name="ethereum" size={20} color="#a78bfa" />
-          ) : (
-            <View style={styles.usdIcon}>
-              <Text style={styles.usdIconText}>$</Text>
-            </View>
-          )}
-          <Text style={styles.coinLabel}>{coin}</Text>
-          <Ionicons name="chevron-down" size={14} color="#666" />
-        </View>
+        {/* Coin selector button */}
+        <TouchableOpacity style={styles.coinSelector} onPress={onCoinSelect} activeOpacity={0.7}>
+          {/* Colored circle icon */}
+          <View style={[styles.coinIcon, { backgroundColor: coin.color + '33' }]}>
+            <Text style={[styles.coinIconText, { color: coin.color }]}>
+              {coin.symbol.slice(0, 1)}
+            </Text>
+          </View>
+          <View>
+            <Text style={styles.coinSymbol}>{coin.symbol}</Text>
+            <Text style={styles.coinName}>{coin.name}</Text>
+          </View>
+          <Ionicons name="chevron-down" size={14} color="#666" style={{ marginLeft: 2 }} />
+        </TouchableOpacity>
 
+        {/* Balance + MAX */}
         <View style={styles.balanceArea}>
-          <Text style={styles.balanceText}>Bal: {balanceLabel}</Text>
+          <Text style={styles.balanceText}>
+            {formatNumber(coin.balance, coin.symbol === 'USDT' || coin.symbol === 'USDC' ? 2 : 4)} {coin.symbol}
+          </Text>
           <TouchableOpacity
             style={styles.maxButton}
-            onPress={() => onAmountChange(maxAmount.toString())}
+            onPress={() => onAmountChange(coin.balance.toString())}
             activeOpacity={0.7}
           >
             <Text style={styles.maxButtonText}>MAX</Text>
@@ -55,8 +62,8 @@ const Currency: React.FC<CurrencySectionProps> = ({ coin, amount, balance, onAmo
         placeholderTextColor="#444"
       />
 
-      {/* ── Conversion hint ── */}
-      <Text style={styles.hint}>{conversionHint}</Text>
+      {/* ── USD hint ── */}
+      <Text style={styles.hint}>{hint}</Text>
     </View>
   );
 };
@@ -79,33 +86,35 @@ const styles = StyleSheet.create({
   coinSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 30,
     paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
   },
-  coinLabel: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600' as const,
-    letterSpacing: 0.3,
-    marginHorizontal: 2,
-  },
-  usdIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#059669',
+  coinIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  usdIconText: {
-    color: '#fff',
-    fontSize: 11,
+  coinIconText: {
+    fontSize: 13,
     fontWeight: '700' as const,
+  },
+  coinSymbol: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600' as const,
+    lineHeight: 16,
+  },
+  coinName: {
+    color: '#666',
+    fontSize: 10,
+    lineHeight: 13,
   },
   balanceArea: {
     flexDirection: 'row',
@@ -114,7 +123,7 @@ const styles = StyleSheet.create({
   },
   balanceText: {
     color: '#666',
-    fontSize: 12,
+    fontSize: 11,
   },
   maxButton: {
     backgroundColor: 'rgba(139,92,246,0.2)',

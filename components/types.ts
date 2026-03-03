@@ -1,10 +1,18 @@
-export type CoinType = 'ETH' | 'USD';
+export type CoinSymbol = 'BTC' | 'ETH' | 'SOL' | 'BNB' | 'USDT' | 'USDC';
+
+export interface Coin {
+  symbol: CoinSymbol;
+  name: string;
+  balance: number;
+  priceUSD: number;   // price in USD
+  color: string;      // accent color for icon
+}
 
 export interface CurrencySectionProps {
-  coin: CoinType;
+  coin: Coin;
   amount: string;
-  balance: number;
   onAmountChange: (value: string) => void;
+  onCoinSelect: () => void;
 }
 
 export interface HandlerCurrencyProps {
